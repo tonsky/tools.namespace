@@ -15,8 +15,12 @@
 (defn remove-lib
   "Remove lib's namespace and remove lib from the set of loaded libs."
   [lib]
-  (remove-ns lib)
-  (dosync (alter @#'clojure.core/*loaded-libs* disj lib)))
+  (let [ns (find-ns lib)
+        hook (:clojure.tools.namespace.repl/before-unload (meta ns))]
+    (when hook
+      (hook))
+    (remove-ns lib)
+    (dosync (alter @#'clojure.core/*loaded-libs* disj lib))))
 
 (defn track-reload-one
   "Executes the next pending unload/reload operation in the dependency

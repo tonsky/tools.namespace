@@ -166,6 +166,15 @@
   ([] (disable-reload! *ns*))
   ([namespace] (alter-meta! namespace assoc ::load false)))
 
+(defn set-unload-hook!
+  "Adds metadata to namespace (or *ns* if unspecified) registering
+  a callback (fn with no arguments) that will be called before namespace
+  is unloaded."
+  ([hook]
+   (set-unload-hook! *ns* hook))
+  ([namespace hook]
+   (alter-meta! namespace assoc ::before-unload hook)))
+
 (defn refresh
   "Scans source code directories for files which have changed (since
   the last time this function was run) and reloads them in dependency
