@@ -209,7 +209,12 @@
   "Sets the directories which are scanned by 'refresh'. Supports the
   same types as clojure.java.io/file."
   [& dirs]
-  (alter-var-root #'refresh-dirs (constantly dirs)))
+  (alter-var-root #'refresh-dirs (constantly dirs))
+  (alter-var-root #'refresh-tracker
+    #(-> %
+       (dir/scan-dirs dirs {:platform find/clj})
+       (update ::track/unload empty)
+       (update ::track/load empty))))
 
 (defn clear
   "Clears all state from the namespace/file tracker. This may help
