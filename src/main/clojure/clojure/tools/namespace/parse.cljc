@@ -59,32 +59,33 @@
   ([rdr read-opts]
    (let [opts (assoc (or read-opts clj-read-opts)
                      :eof ::eof)]
-     (loop [name nil
-            body []]
-       (let [form (reader/read opts rdr)
-             tag  (when (list? form)
-                    (first form))]
-         (cond
-           (= 'ns tag)
-           (recur (second form) (nnext form))
-           
-           (= 'in-ns tag)
-           (recur (expand-quotes (second form)) [])
-           
-           (= 'require tag)
-           (let [ns-form (list* :require (expand-quotes (next form)))]
-             (recur name (conj body ns-form)))
-           
-           (= 'use tag)
-           (let [ns-form (list* :use (expand-quotes (next form)))]
-             (recur name (conj body ns-form)))
-           
-           (= ::eof form)
-           (when name
-             (list* 'ns name body))
-           
-           :else 
-           (recur name body)))))))
+     (binding [reader/*default-data-reader-fn* tagged-literal]
+       (loop [name nil
+              body []]
+         (let [form (reader/read opts rdr)
+               tag  (when (list? form)
+                      (first form))]
+           (cond
+             (= 'ns tag)
+             (recur (second form) (nnext form))
+             
+             (= 'in-ns tag)
+             (recur (expand-quotes (second form)) [])
+             
+             (= 'require tag)
+             (let [ns-form (list* :require (expand-quotes (next form)))]
+               (recur name (conj body ns-form)))
+             
+             (= 'use tag)
+             (let [ns-form (list* :use (expand-quotes (next form)))]
+               (recur name (conj body ns-form)))
+             
+             (= ::eof form)
+             (when name
+               (list* 'ns name body))
+             
+             :else 
+             (recur name body))))))))
 
 ;;; Parsing dependencies
 
