@@ -76,26 +76,6 @@
 (deftest t-no-deps-returns-empty-set
   (is (= #{} (deps-from-ns-decl '(ns com.example.one)))))
 
-(def multiple-ns-decls
-  '((ns one)
-    (ns two (:require one))
-    (ns three (:require [one :as o] [two :as t]))))
-
-(def multiple-ns-decls-string
-" (println \"Code before first ns\")
-  (ns one)
-  (println \"Some code\")
-  (defn hello-world [] \"Hello, World!\")
-  (ns two (:require one))
-  (println \"Some more code\")
-  (ns three (:require [one :as o] [two :as t]))")
-
-(deftest t-read-multiple-ns-decls
-  (with-open [rdr (java.io.PushbackReader.
-                   (java.io.StringReader. multiple-ns-decls-string))]
-    (is (= multiple-ns-decls
-           (take-while identity (repeatedly #(read-ns-decl rdr)))))))
-
 (def ns-docstring-example
   "The example ns declaration used in the docstring of clojure.core/ns"
   '(ns foo.bar
@@ -204,3 +184,31 @@
                    str->ns-decl
                    deps-from-ns-decl)]
     (is (= #{'org.macros} actual))))
+
+(def multiple-clauses-str
+  "(ns foo.bar)
+   (require 'com.example.one)
+   (import 'java.io.File)
+   (require '(com.example two three))
+   (use '(com.example [four :only [x]]))
+   (use '(com.example (five :only [x])))")
+
+(deftest t-deps-from-multiple-clauses-dynamic
+  (let [actual (-> multiple-clauses-str
+                   str->ns-decl
+                   deps-from-ns-decl)]
+    (is (= deps-from-multiple-clauses actual))))
+
+(def in-ns-str
+  "(in-ns 'com.example)
+   (require 'com.example.one
+            '[com.example.two])
+   (use '[com.example three])
+   (require ['com.example 'four]
+            '[com.example [five]])")
+
+(deftest t-in-ns
+  (let [actual (-> in-ns-str
+                   str->ns-decl
+                   deps-from-ns-decl)]
+    (is (= deps-from-multiple-clauses actual))))

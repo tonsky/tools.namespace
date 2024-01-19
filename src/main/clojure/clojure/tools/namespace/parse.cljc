@@ -12,7 +12,8 @@
   clojure.tools.namespace.parse
   (:require #?(:clj [clojure.tools.reader :as reader]
                :cljs [cljs.tools.reader :as reader])
-            [clojure.set :as set]))
+            [clojure.set :as set]
+            [clojure.walk :as walk]))
 
 (defn comment?
   "Returns true if form is a (comment ...)"
@@ -36,6 +37,13 @@
   {:read-cond :allow
    :features #{:cljs}})
 
+(defn- expand-quotes [form]
+  (walk/postwalk
+    #(if (and (list? %) (= 'quote (first %)))
+       (second %)
+       %)
+    form))
+
 (defn read-ns-decl
   "Attempts to read a (ns ...) declaration from a reader, and returns
   the unevaluated form. Returns the first top-level ns form found.
@@ -51,12 +59,32 @@
   ([rdr read-opts]
    (let [opts (assoc (or read-opts clj-read-opts)
                      :eof ::eof)]
-     (loop []
-       (let [form (reader/read opts rdr)]
+     (loop [name nil
+            body []]
+       (let [form (reader/read opts rdr)
+             tag  (when (list? form)
+                    (first form))]
          (cond
-           (ns-decl? form) form
-           (= ::eof form) nil
-           :else (recur)))))))
+           (= 'ns tag)
+           (recur (second form) (nnext form))
+           
+           (= 'in-ns tag)
+           (recur (expand-quotes (second form)) [])
+           
+           (= 'require tag)
+           (let [ns-form (list* :require (expand-quotes (next form)))]
+             (recur name (conj body ns-form)))
+           
+           (= 'use tag)
+           (let [ns-form (list* :use (expand-quotes (next form)))]
+             (recur name (conj body ns-form)))
+           
+           (= ::eof form)
+           (when name
+             (list* 'ns name body))
+           
+           :else 
+           (recur name body)))))))
 
 ;;; Parsing dependencies
 
