@@ -130,6 +130,10 @@
    ;; (re)loaded to bring the running system into agreement with the
    ;; source files.
    :clojure.tools.namespace.track/load ()
+   
+   ;; Unordered ser of namespace names (symbols) that was ever loaded.
+   ;; Used to avoid loading namespaces that weren't loaded in the first place.
+   :clojure.tools.namespace.track/active #{}
 
    ;; Added by clojure.tools.namespace.file: Map from source files
    ;; (java.io.File) to the names (symbols) of namespaces they

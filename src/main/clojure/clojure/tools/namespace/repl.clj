@@ -41,6 +41,17 @@
       (update-in [::track/unload] #(remove unload-disabled? %))
       (update-in [::track/load] #(remove load-disabled? %))))
 
+(defn- update-active [tracker]
+  (let [active (::track/active tracker)
+        loaded (filter @#'clojure.core/*loaded-libs* (::track/load tracker))]
+    (update-in tracker [::track/active] (fnil into #{}) loaded)))
+
+(defn- remove-inactive [tracker]
+  (let [active (::track/active tracker)]
+    (-> tracker
+        (update-in [::track/unload] #(filter active %))
+        (update-in [::track/load] #(filter active %)))))
+
 (defn- referred
   "Given a Namespace object, returns a map of symbols describing the
   Vars it refers from other namespaces, in the following form:
@@ -87,12 +98,15 @@
 
   Optional argument is map of options:
 
-      :platform  Either clj (default) or cljs, both defined in
-                 clojure.tools.namespace.find, controls file extensions
-                 and reader options.
+      :platform      Either clj (default) or cljs, both defined in
+                     clojure.tools.namespace.find, controls file extensions
+                     and reader options.
 
-      :add-all?  If true, assumes all extant files are modified regardless
-                 of filesystem timestamps.
+      :add-all?      If true, assumes all extant files are modified regardless
+                     of filesystem timestamps.
+   
+      :only-active?  If true, does not try to load namespaces that weren't
+                     previously explicitly loaded.
 
   Returns map with keys:
 
@@ -104,7 +118,11 @@
    (alter-var-root #'refresh-tracker
      #(-> %
         (dir/scan-dirs refresh-dirs options)
-        (remove-disabled)))))
+        remove-disabled
+        update-active
+        (cond->
+          (:only-active? options)
+          remove-inactive)))))
 
 (defn refresh-scanned
   "Reloads namespaces in dependency order. Does not scan directories again,
@@ -186,13 +204,17 @@
 
   Options are key-value pairs. Valid options are:
 
-      :after   Namespace-qualified symbol naming a zero-argument
-               function to be invoked after a successful refresh. This
-               symbol will be resolved *after* all namespaces have
-               been reloaded."
+      :after         Namespace-qualified symbol naming a zero-argument
+                     function to be invoked after a successful refresh. This
+                     symbol will be resolved *after* all namespaces have
+                     been reloaded.
+   
+      :only-active?  If true, does not try to load namespaces that weren't
+                     previously explicitly loaded."
   [& options]
-  (let [{:keys [after]} options]
-    (scan {:platform find/clj})
+  (let [{:keys [after only-active?]} options]
+    (scan {:platform     find/clj
+           :only-active? only-active?})
     (apply refresh-scanned options)))
 
 (defn refresh-all
@@ -204,14 +226,18 @@
 
   Options are key-value pairs. Valid options are:
 
-      :after   Namespace-qualified symbol naming a zero-argument
-               function to be invoked after a successful refresh. This
-               symbol will be resolved *after* all namespaces have
-               been reloaded."
+      :after         Namespace-qualified symbol naming a zero-argument
+                     function to be invoked after a successful refresh. This
+                     symbol will be resolved *after* all namespaces have
+                     been reloaded.
+      
+      :only-active?  If true, does not try to load namespaces that weren't
+                     previously explicitly loaded."
   [& options]
-  (let [{:keys [after]} options]
-    (scan {:platform find/clj
-           :add-all? true})
+  (let [{:keys [after only-active?]} options]
+    (scan {:platform     find/clj
+           :add-all?     true
+           :only-active? only-active?})
     (apply refresh-scanned options)))
 
 (defn set-refresh-dirs
